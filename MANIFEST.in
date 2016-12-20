@@ -1,0 +1,5 @@
+include *.rst
+include *.csv
+
+# Include the data files
+recursive-include data *
