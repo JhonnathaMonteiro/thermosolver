@@ -250,22 +250,6 @@ class pr_mod(cubic):
     def baseTV(T,P,comp):
         pass
 
-    # def coef_fug(self, Z,P,A_,B_):
-    #     # Parâmetro Aux1 e Aux2
-    #     Aux1 = log(Z/(Z-B_))
-    #     Aux2 = A_/B_*log(Z/(Z+B_))
-
-    #     # Logaritmo do coef. de fugacidade
-    #     ln_Phi = Aux1 + Aux2 + (Z - 1) - log(Z)
-        
-    #     # coef de fugacidade
-    #     Phi = exp(ln_Phi)
-
-    #     # fugacidade
-    #     f = Phi*P
-
-    #     return ln_Phi, Phi, f
-
 
     def PR_TP(self,T,P,componente):
         Tc,w = BdD.get_dados(componente,ret=[0,3])
