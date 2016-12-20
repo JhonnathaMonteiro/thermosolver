@@ -9,11 +9,14 @@ from .database import BdD
 from thermosolver.config import config_bwrs, config_vdw, config_rk_mod, config_pr_mod
 
 
-
 class cubic(object):
     """docstring for cubic"""
     
-    def solverAnalitic(self,T,P,A,R):
+    def solverAnalitic(self):
+        T = self.T
+        P = self.P
+        R = self.R
+        A = self.A
         # Solucao analitica
         Q_2 = (A[0]+2*A[2]**3/27-A[2]*A[1]/3)/2
         P_3 = (3*A[1]-A[2]**2)/9
@@ -43,34 +46,59 @@ class cubic(object):
 
 class vdw(cubic):
     """docstring for vdw"""
-    def __init__(self):
-        super(vdw, self).__init__()
+    def __init__(self,T,comp,*args,**kwargs):
+        R, Omega_a, Omega_b = config_vdw.conf()
+        Tc,Pc,Vc,w = BdD.get_dados(comp,ret=[0,1,2,3])
+
+        self.T = T
+        self.Tc = Tc
+        self.Pc = Pc
+        self.Vc = Vc
+        self.Tr = T/Tc
+        self.R = R
+        self.comp = comp
+        self.Omega_a = Omega_a
+        self.Omega_b = Omega_b
+
+        for k in kwargs.keys():
+            if k in ('P', 'T', 'V', 'comp'):
+                self.__setattr__(k,kwargs[k])
+
+        if hasattr(self, 'P'):
+            self.Pr = self.P/Pc 
+
 
     # T e P independentes
-    def TP(self,T,P,componente):
+    def TP(self):
+        if not hasattr(self, 'P'):
+            raise AttributeError('Invalid method, inform T= , P= , comp= " " ')
         
         # Constantes caracteristicas
-        R, Omega_a, Omega_b = config_vdw.conf()
-        Tc,Pc = BdD.get_dados(componente,ret=[0,1])
-        
-        # Proriedades reduzidas
-        Tr, Pr = T/Tc, P/Pc
-        
+        Tr = self.Tr 
+        Pr  = self.Pr 
+        Omega_a = self.Omega_a 
+        Omega_b = self.Omega_b 
+                        
         # Calculo das constantes A*=A_ e B*=B_
         A_  = Omega_a*Pr/Tr**2
         B_  = Omega_b*Pr/Tr
         
         # Coeficientes da equacao cubica
-        A = [-A_*B_, A_,-(B_ + 1)]
-        
+        self.A = [-A_*B_, A_,-(B_ + 1)]
+
+
         # Solucao analitica
-        return vdw.solverAnalitic(self,T,P,A,R)
+        return vdw.solverAnalitic(self)
 
     # T e V independentes
-    def TV(T,V,componente):
-
-        R = config_vdw.conf()[0]
-        Tc,Pc = BdD.get_dados(componente,ret=[0,1])
+    def TV(self):
+        T = self.T 
+        V = self.V
+        Tc = self.Tc 
+        Pc = self.Pc 
+        R = self.R 
+        Omega_a = self.Omega_a 
+        Omega_b = self.Omega_b 
         Alpha = Alpha_r = Alpha_c = 1
         
         # cálculo das constantes características ac, b, a
@@ -85,13 +113,15 @@ class vdw(cubic):
         Z = P*V/(R*T)
         return {'Z':Z,'P':P}
 
-    def Tboyle(self,componente):
+    def Tboyle(self):
         from config_vdw import conf
         Omega_a, Omega_b = conf()[1:]
-        Tc = BdD.get_dados(componente,ret=[0])[0]
+        Tc = BdD.get_dados(comp,ret=[0])[0]
         Tboyle_r = Omega_a/Omega_b
         Tboyle = Tboyle_r*Tc
         return {'Tboyle':Tboyle}
+
+
 
 class rk_mod(cubic):
     """docstring for rk_mod"""
@@ -249,22 +279,6 @@ class pr_mod(cubic):
 
     def baseTV(T,P,comp):
         pass
-
-    # def coef_fug(self, Z,P,A_,B_):
-    #     # Parâmetro Aux1 e Aux2
-    #     Aux1 = log(Z/(Z-B_))
-    #     Aux2 = A_/B_*log(Z/(Z+B_))
-
-    #     # Logaritmo do coef. de fugacidade
-    #     ln_Phi = Aux1 + Aux2 + (Z - 1) - log(Z)
-        
-    #     # coef de fugacidade
-    #     Phi = exp(ln_Phi)
-
-    #     # fugacidade
-    #     f = Phi*P
-
-    #     return ln_Phi, Phi, f
 
 
     def PR_TP(self,T,P,componente):
