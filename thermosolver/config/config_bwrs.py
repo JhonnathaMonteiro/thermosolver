@@ -1,5 +1,5 @@
 def conf():
-    """Constantes da equação bwrs"""
+    """Constantes da equação bwrs """
     #------------------------R-------------------------------
     R=83.14462
 
