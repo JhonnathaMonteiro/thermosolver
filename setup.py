@@ -39,6 +39,7 @@ setup(
   author = 'Jhonnatha de Andrade Monteiro',
   long_description=open('README.rst').read(),
   author_email = 'jhonnatha.am@gmail.com',
+  url = 'https://github.com/JhonnathaAndrade/thermosolver' ,
   keywords = ['chemical engineering', 'chemistry', 'mechanical engineering', 
   'thermodynamics', 'databases', 'cheminformatics'],
   classifiers = classifiers,
