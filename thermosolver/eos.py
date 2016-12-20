@@ -121,8 +121,6 @@ class vdw(cubic):
         Tboyle = Tboyle_r*Tc
         return {'Tboyle':Tboyle}
 
-
-
 class rk_mod(cubic):
     """docstring for rk_mod"""
     def __init__(self):
