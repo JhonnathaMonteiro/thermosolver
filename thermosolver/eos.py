@@ -1,50 +1,16 @@
 
 from __future__ import division, print_function, absolute_import
 
-__all__ = ['vdw', 'rk_mod', 'pr_mod', 'bwrs']
+__all__ = ['vdw_base', 'rk_mod', 'pr_mod', 'bwrs']
 
 
 from math import sqrt, cos, acos, exp, log, pi
 from .database import BdD
 from thermosolver.config import config_bwrs, config_vdw, config_rk_mod, config_pr_mod
+from .cubicsolver import solverAnalitic
 
 
-class cubic(object):
-    """docstring for cubic"""
-    
-    def solverAnalitic(self):
-        T = self.T
-        P = self.P
-        R = self.R
-        A = self.A
-        # Solucao analitica
-        Q_2 = (A[0]+2*A[2]**3/27-A[2]*A[1]/3)/2
-        P_3 = (3*A[1]-A[2]**2)/9
-        Delta = P_3**3 + Q_2**2
-
-        if Delta >= 0:
-            u = (-Q_2+sqrt(Delta))**(1/3)
-            v = -P_3/u
-            x1 = -A[2]/3 + u + v
-
-            # Fator de compressibilidade
-            Z = x1
-            V = Z*R*T/P
-            return {'Z':Z,'V':V}
-
-        else:
-            Phi = acos(-Q_2/sqrt(-P_3**3))
-            x1 = -A[2]/3 + 2*sqrt(-P_3)*cos(Phi/3)
-            x2 = -A[2]/3 + 2*sqrt(-P_3)*cos((Phi-pi)/3)
-            x3 = -A[2]/3 + 2*sqrt(-P_3)*cos((Phi+pi)/3)
-            
-            # Fator de compressibilidade
-            Zv, Zl = max(x1,x2,x3), min(x1,x2,x3)
-            Vv = Zv*R*T/P
-            Vl = Zl*R*T/P
-            return {'Zv':Zv,'Zl':Zl,'Vv':Vv,'Vl':Vl}
-
-class vdw(cubic):
+class vdw_base(object):
     """docstring for vdw"""
     def __init__(self,T,comp,*args,**kwargs):
         R, Omega_a, Omega_b = config_vdw.conf()
@@ -69,49 +35,45 @@ class vdw(cubic):
 
 
     # T e P independentes
-    def TP(self):
-        if not hasattr(self, 'P'):
-            raise AttributeError('Invalid method, inform T= , P= , comp= " " ')
-        
-        # Constantes caracteristicas
-        Tr = self.Tr 
-        Pr  = self.Pr 
+    def vdw(self):
         Omega_a = self.Omega_a 
         Omega_b = self.Omega_b 
-                        
-        # Calculo das constantes A*=A_ e B*=B_
-        A_  = Omega_a*Pr/Tr**2
-        B_  = Omega_b*Pr/Tr
         
-        # Coeficientes da equacao cubica
-        self.A = [-A_*B_, A_,-(B_ + 1)]
+        if hasattr(self, 'P'):
+            # Constantes caracteristicas
+            Tr = self.Tr 
+            Pr  = self.Pr 
+                            
+            # Calculo das constantes A*=A_ e B*=B_
+            A_  = Omega_a*Pr/Tr**2
+            B_  = Omega_b*Pr/Tr
+            
+            # Coeficientes da equacao cubica
+            self.A = [-A_*B_, A_,-(B_ + 1)]
 
+            # Solucao analitica
+            return solverAnalitic(self)
 
-        # Solucao analitica
-        return vdw.solverAnalitic(self)
+        elif hasattr(self, 'V'):
+            T = self.T 
+            V = self.V
+            Tc = self.Tc 
+            Pc = self.Pc 
+            R = self.R 
 
-    # T e V independentes
-    def TV(self):
-        T = self.T 
-        V = self.V
-        Tc = self.Tc 
-        Pc = self.Pc 
-        R = self.R 
-        Omega_a = self.Omega_a 
-        Omega_b = self.Omega_b 
-        Alpha = Alpha_r = Alpha_c = 1
+            Alpha = Alpha_r = Alpha_c = 1
+            # cálculo das constantes características ac, b, a
+            ac = Omega_a*R**2*Tc**2/(Alpha_c*Pc)
+            b = Omega_b*R*Tc/Pc
+            a = ac*Alpha
+            
+            # cálculo da pressão em bar
+            P = R*T/(V - b) - a/V**2
+            
+            # cálculo do fator de compressibilidade
+            Z = P*V/(R*T)
+            return {'Z':Z,'P':P}
         
-        # cálculo das constantes características ac, b, a
-        ac = Omega_a*R**2*Tc**2/(Alpha_c*Pc)
-        b = Omega_b*R*Tc/Pc
-        a = ac*Alpha
-        
-        # cálculo da pressão em bar
-        P = R*T/(V - b) - a/V**2
-        
-        # cálculo do fator de compressibilidade
-        Z = P*V/(R*T)
-        return {'Z':Z,'P':P}
 
     def Tboyle(self):
         from config_vdw import conf
@@ -121,16 +83,37 @@ class vdw(cubic):
         Tboyle = Tboyle_r*Tc
         return {'Tboyle':Tboyle}
 
-class rk_mod(cubic):
+class rk_mod(object):
     """docstring for rk_mod"""
-    def __init__(self):
-        super(rk_mod, self).__init__()
+    def __init__(self,T,comp,*args,**kwargs):
+        R, Omega_a, Omega_b = config_rk_mod.conf()
+        Tc,Pc,Vc,w = BdD.get_dados(comp,ret=[0,1,2,3])
+
+        self.T = T
+        self.Tc = Tc
+        self.Pc = Pc
+        self.Vc = Vc
+        self.w = w
+        self.Tr = T/Tc
+        self.R = R
+        self.comp = comp
+        self.Omega_a = Omega_a
+        self.Omega_b = Omega_b
+
+        for k in kwargs.keys():
+            if k in ('P', 'T', 'V', 'comp'):
+                self.__setattr__(k,kwargs[k])
+
+        if hasattr(self, 'P'):
+            self.Pr = self.P/Pc 
     
-    def baseTP(self,T,P,componente,Alpha_r):
-        R,Omega_a,Omega_b = config_rk_mod.conf()        
-        Tc,Pc,w = BdD.get_dados(componente,ret=[0,1,3])
-        # propriedadede reduzida
-        Tr, Pr = T/Tc, P/Pc
+    def baseTP(self):
+        
+        Tr = self.Tr
+        Pr = self.Pr
+        Omega_a = self.Omega_a
+        Omega_b = self.Omega_b
+        Alpha_r = self.Alpha_r
         
         # cálculo dos parâmetros adimensinais
         A_ = Pr*Alpha_r*Omega_a/Tr**2 
@@ -140,14 +123,18 @@ class rk_mod(cubic):
         A = [-A_*B_, A_-B_**2-B_, -1]
         
         # Solucao analitica
-        return rk_mod.solverAnalitic(self,T,P,A,R)
+        return solverAnalitic(self)
 
     def baseTV(self,T,V,componente,Alpha,Alpha_c):
-        R, Omega_a,Omega_b = config_rk_mod.conf()
-        Tc,Pc,w = BdD.get_dados(componente,ret=[0,1,3])
-        
-        # propriedadede reduzida
-        Tr = T/Tc
+        T = self.T
+        Tc = self.Tc
+        Pc = self.Pc
+        V = self.V
+        R = self.R
+        Alpha = self.Alpha
+        Alpha_c = self.Alpha_c
+        Omega_a = self.Omega_a
+        Omega_b = self.Omega_b
         
         # constantes caracteristicas
         ac = Omega_a*(R*Tc)**2/(Alpha_c*Pc)
@@ -162,129 +149,122 @@ class rk_mod(cubic):
 
         return {'P':P,'Z':Z}
 
-    def RK_TP(self,T,P,componente):
-        # propriededades físicas da substância
-        Tc = BdD.get_dados(componente,ret=[0])[0]
+    def RK(self):
+        # T e P independentes
+        if hasattr(self, 'P'):
+            # cálculo do parâmetro Alpha
+            self.Alpha_r = 1/sqrt(Tr)
+            return rk_mod.baseTP(self)
+        
+        # T e V independentes
+        elif hasattr(self, 'V'):
+            T = self.T
+            Tc = self.Tc
+            # cálculo dos parâmetros Alpha
+            self.Alpha_c = 1/sqrt(Tc)
+            self.Alpha = 1/sqrt(T)
+            return rk_mod.baseTV(self)
 
-        # constantes características e R:
-        R,Omega_a,Omega_b = config_rk_mod.conf()
-
-        # propriedadede reduzida
-        Tr = T/Tc
-
-        # cálculo do parâmetro Alpha
-        Alpha_r = 1/sqrt(Tr)
-
-        return rk_mod.baseTP(self,T,P,componente,Alpha_r)
-
-    def RK_TV(self,T,V,componente):
-        # propriededades físicas da substância
-        Tc = BdD.get_dados(componente,ret=[0])[0]
-
-        # constantes características e R:
-        R,Omega_a,Omega_b = config_rk_mod.conf()
-
-        # propriedadede reduzida
-        Tr = T/Tc
-
-        # cálculo dos parâmetros Alpha
-        Alpha_c = 1/sqrt(Tc)
-        Alpha = 1/sqrt(T)
-
-        return rk_mod.baseTV(self, T,V,componente,Alpha,Alpha_c)
-
-    def wilson_TP(self,T,P,componente):
-        # propriededades físicas da substância
-        Tc,w= BdD.get_dados(componente,ret=[0,3])
-
-        # constantes características e R:
-        R,Omega_a,Omega_b = config_rk_mod.conf()
-
-        # propriedadede reduzida
-        Tr = T/Tc
-
+    def wilson(self):
+        w = self.w
+        Tr = self.Tr
         # cálculo do parâmetro Alpha
         m = 1.57 + 1.62*w
-        Alpha_r = Tr*(1+m*(1/Tr-1))
+        self.Alpha_r = Tr*(1+m*(1/Tr-1))
+        if hasattr(self, 'P'):
+            return rk_mod.baseTP(self)
+        elif hasattr(self, 'V'):
+            self.Alpha_c = 1
+            return rk_mod.baseTV(self)
 
-        return rk_mod.baseTP(T,P,componente,Alpha_r)
 
-    def wilson_TV(self,T,V,componente):
-        # propriededades físicas da substância
-        Tc,w = BdD.get_dados(componente,ret=[0,3])
-
-        # constantes características e R:
-        R,Omega_a,Omega_b = config_rk_mod.conf()
-
-        # propriedadede reduzida
-        Tr = T/Tc
-
-        # cálculo dos parâmetros Alpha
-        m = 1.57 + 1.62*w
-        Alpha = Tr*(1+m*(1/Tr-1))
-        Alpha_c = 1
-        return rk_mod.baseTV(T,V,componente,Alpha,Alpha_c)
-
-    def SRK_TP(self,T,P,componente):
-        # propriededades físicas da substância
-        Tc,w= BdD.get_dados(componente,ret=[0,3])
-
-        # constantes características e R:
-        R, Omega_a,Omega_b = config_rk_mod.conf()
-
-        # propriedadede reduzida
-        Tr = T/Tc
-
+    def SRK(self):
+        w = self.w
+        Tr = self.Tr
         # cálculo do parâmetro Alpha
         m = 0.480 + 1.574*w - 0.176*w**2 
-        Alpha_r = (1+m*(1-sqrt(Tr)))**2
+        self.Alpha_r = (1+m*(1-sqrt(Tr)))**2
+        if hasattr(self, 'P'):
+            return rk_mod.baseTP(self)
+        elif hasattr(self, 'V'):
+            self.Alpha_c = 1
+            return rk_mod.baseTV(self)
 
-        return rk_mod.baseTP(T,P,componente,Alpha_r)
-
-    def SRK_TV(self,T,V,componente):
-        Tc,w = BdD.get_dados(componente,ret=[0,3])
-
-        # constantes características e R:
-        R, Omega_a,Omega_b = config_rk_mod.conf()
-
-        # propriedadede reduzida
-        Tr = T/Tc
-
-        # cálculo dos parâmetros Alpha
-        m = 0.480 + 1.574*w - 0.176*w**2 
-        Alpha = (1+m*(1-sqrt(Tr)))**2
-        Alpha_c = 1
-        return rk_mod.baseTV(T,V,componente,Alpha,Alpha_c)
-
-class pr_mod(cubic):
+class pr_mod(object):
     """docstring for pr_mod"""
-    def __init__(self):
-        super(pr_mod, self).__init__()
-    
-    def baseTP(sef,T,P,componente,Alpha_r):
+    def __init__(self,T,comp,*args,**kwargs):
         R, Omega_a, Omega_b = config_pr_mod.conf()
-        Tc,Pc = BdD.get_dados(componente,ret=[0,1])
-        # propriedades reduzidas
-        Tr = T/Tc
-        Pr = P/Pc
+        Tc,Pc,Vc,w = BdD.get_dados(comp,ret=[0,1,2,3])
+
+        self.T = T
+        self.Tc = Tc
+        self.Pc = Pc
+        self.Vc = Vc
+        self.w = w
+        self.Tr = T/Tc
+        self.R = R
+        self.comp = comp
+        self.Omega_a = Omega_a
+        self.Omega_b = Omega_b
+
+        for k in kwargs.keys():
+            if k in ('P', 'T', 'V', 'comp'):
+                self.__setattr__(k,kwargs[k])
+
+        if hasattr(self, 'P'):
+            self.Pr = self.P/Pc 
+    
+    def baseTP(self):
+        Tr = self.Tr
+        Pr = self.Pr
+        Omega_a = self.Omega_a
+        Omega_b = self.Omega_b
+        Alpha_r = self.Alpha_r
+
         # calculo dos parametros reduzidos
         A_ = Omega_a*Alpha_r*Pr/Tr**2
         B_ = Omega_b*Pr/Tr
         # calculo dos coeficentes da equacao cubica
-        A = [B_**3+B_**2-A_*B_, -(3*B_**2+2*B_-A_), B_-1]        
+        self.A = [B_**3+B_**2-A_*B_, -(3*B_**2+2*B_-A_), B_-1]   
         # Solucao analitica
-        return pr_mod.solverAnalitic(self,T,P,A,R)
+        return solverAnalitic(self)
 
-    def baseTV(T,P,comp):
-        pass
+    def baseTV(self):
+        T = self.T
+        Tc = self.Tc
+        Pc = self.Pc
+        V = self.V
+        R = self.R
+        Alpha = self.Alpha
+        Alpha_c = self.Alpha_c
+        Omega_a = self.Omega_a
+        Omega_b = self.Omega_b
+        
+        # constantes caracteristicas
+        ac = Omega_a*(R*Tc)**2/(Alpha_c*Pc)
+        b = Omega_b*R*Tc/Pc
+        a = ac*Alpha
+
+        # calculo da pressão em bar
+        P = R*T/(V-b)-a/(V**2+2*b*V-b**2)
+
+        # fator de compressibilidade
+        Z = P*V/(R*T)
+
+        return {'P':P,'Z':Z}
 
 
-    def PR_TP(self,T,P,componente):
-        Tc,w = BdD.get_dados(componente,ret=[0,3])
-        Tr = T/Tc
+    def PR(self):
+        Tr = self.Tr
+        w = self.w
         m = 0.37464 + 1.54226*w - 0.26992*w**2
-        Alpha = (1 + m*(1-sqrt(Tr)))**2
-        return pr_mod.baseTP(T,P,componente,Alpha)
+        self.Alpha_r = (1 + m*(1-sqrt(Tr)))**2
+        self.Alpha_c = 1
+        self.Alpha = self.Alpha_r
+        if hasattr(self, 'P'):
+            return pr_mod.baseTP(self)
+        elif hasattr(self, 'V'):
+            return pr_mod.baseTV(self)
 
 class bwrs(object):
     """docstring for bwrs"""
