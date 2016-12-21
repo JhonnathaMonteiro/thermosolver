@@ -227,7 +227,7 @@ class pr_mod(object):
         # calculo dos coeficentes da equacao cubica
         self.A = [B_**3+B_**2-A_*B_, -(3*B_**2+2*B_-A_), B_-1]   
         # Solucao analitica
-<<<<<<< HEAD
+
         return solverAnalitic(self)
 
     def baseTV(self):
@@ -253,13 +253,9 @@ class pr_mod(object):
         Z = P*V/(R*T)
 
         return {'P':P,'Z':Z}
-=======
-        return pr_mod.solverAnalitic(self,T,P,A,R)
 
     def baseTV(T,P,comp):
         pass
->>>>>>> master
-
 
     def PR(self):
         Tr = self.Tr
