@@ -1,4 +1,6 @@
+
 # arquivo em galho
+
 from __future__ import division, print_function, absolute_import
 
 __all__ = ['vdw_base', 'rk_mod', 'pr_mod', 'bwrs']
