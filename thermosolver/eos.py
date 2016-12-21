@@ -1,4 +1,5 @@
-
+# grande diferença
+# vamo ser se merge agora
 from __future__ import division, print_function, absolute_import
 
 __all__ = ['vdw_base', 'rk_mod', 'pr_mod', 'bwrs']
