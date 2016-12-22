@@ -17,15 +17,19 @@ class BdD(object):
         with open(file, 'r') as csvfile:
             csvreader = csv.reader(csvfile,delimiter='\t',quoting=csv.QUOTE_NONNUMERIC)
 
-            # Atribuindo os valores as listas
-            CASRN = []
-            Name = []
-            Dados = []
+            # # Atribuindo os valores as listas
+            # CASRN = []
+            # Name = []
+            # Dados = []
             
-            for row in csvreader:
-                CASRN.append(row[0])
-                Name.append(row[1])
-                Dados.append(row[2:])
+            # for row in csvreader:
+            #     CASRN.append(row[0])
+            #     Name.append(row[1])
+            #     Dados.append(row[2:])
+
+            CASRN = [row[0] for row in csvreader]
+            Name = [row[1] for row in csvreader]
+            Dados = [row[2:] for row in csvreader]
 
         try:
             I = Name.index(componente)
