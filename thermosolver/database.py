@@ -4,8 +4,9 @@ class BdD(object):
         super(BdD, self).__init__()
 
 
-    def get_dados(componente,ret=None):
+    def get_dados(componente):
         import csv
+        from collections import namedtuple
         # Name;Formula;MW;Tc;Pc;Vc;Rho_c;Zc;w
         # alocando espaço para as listas
 
@@ -14,38 +15,23 @@ class BdD(object):
         folder = os.path.join(os.path.dirname(__file__), 'critical_data')
         file = os.path.join(folder, 'Yaws Collection.csv')
 
+        Especie = namedtuple('Componente','CASRN Name Tc Pc Vc w')
+        saida = None
         with open(file, 'r') as csvfile:
             csvreader = csv.reader(csvfile,delimiter='\t',quoting=csv.QUOTE_NONNUMERIC)
-
             headers = next(csvreader)
-
-            # Atribuindo os valores as listas
-            CASRN = []
-            Name = []
-            Dados = []
-            
+            a = []
             for row in csvreader:
-                CASRN.append(row[0])
-                Name.append(row[1])
-                Dados.append(row[2:])
+                if componente in (row[0],row[1]):
+                    saida = Especie(*row)
+                    print
+                    break  
 
-        try:
-            I = Name.index(componente)
-        except ValueError: 
-            try:
-                I = CASRN.index(componente)
-            except ValueError:
-                raise ValueError('Componente fora do banco de dados')      
+            if not saida:
+                raise ValueError('Especie não encontrada no banco de dados')
 
-        saida = []
-        for j in ret:
-            saida.append(Dados[I][j])
-
-        if all(isinstance(n,float) for n in saida):
-            return saida
-        else:
-            raise ValueError('Dados incompletos no banco de dados')
+        return saida
 
 if __name__ == '__main__':
-    a = BdD.get_dados('benzene',ret=[1,2,3])
-    print(a[2])
+    _,_,Tc,Pc,Vc,w  = BdD.get_dados('hexamethyldisilazane')
+    print(Tc)
