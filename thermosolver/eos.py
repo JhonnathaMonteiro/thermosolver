@@ -10,7 +10,7 @@ from thermosolver.config import config_bwrs, config_vdw, config_rk_mod, config_p
 from .cubicsolver import solverAnalitic
 
 
-class vdw_base(object):
+class vdw_mod(object):
     """docstring for vdw"""
     def __init__(self,T,comp,*args,**kwargs):
         R, Omega_a, Omega_b = config_vdw.conf()
@@ -33,6 +33,9 @@ class vdw_base(object):
         if hasattr(self, 'P'):
             self.Pr = self.P/Pc 
 
+    def __repr__(self):
+        return str(self.vdw())
+
 
     # T e P independentes
     def vdw(self):
@@ -43,14 +46,11 @@ class vdw_base(object):
             # Constantes caracteristicas
             Tr = self.Tr 
             Pr  = self.Pr 
-                            
             # Calculo das constantes A*=A_ e B*=B_
             A_  = Omega_a*Pr/Tr**2
             B_  = Omega_b*Pr/Tr
-            
             # Coeficientes da equacao cubica
             self.A = [-A_*B_, A_,-(B_ + 1)]
-
             # Solucao analitica
             return solverAnalitic(self)
 
@@ -66,10 +66,8 @@ class vdw_base(object):
             ac = Omega_a*R**2*Tc**2/(Alpha_c*Pc)
             b = Omega_b*R*Tc/Pc
             a = ac*Alpha
-            
             # cálculo da pressão em bar
             P = R*T/(V - b) - a/V**2
-            
             # cálculo do fator de compressibilidade
             Z = P*V/(R*T)
             return {'Z':Z,'P':P}
@@ -107,6 +105,9 @@ class rk_mod(object):
         if hasattr(self, 'P'):
             self.Pr = self.P/Pc 
     
+    def __repr__(self):
+        return str(self.RK())
+
     def baseTP(self):
         
         Tr = self.Tr
@@ -120,7 +121,7 @@ class rk_mod(object):
         B_ = Pr*Omega_b/Tr
 
         # Coeficientes da equacao cubica
-        A = [-A_*B_, A_-B_**2-B_, -1]
+        self.A = [-A_*B_, A_-B_**2-B_, -1]
         
         # Solucao analitica
         return solverAnalitic(self)
@@ -152,6 +153,7 @@ class rk_mod(object):
     def RK(self):
         # T e P independentes
         if hasattr(self, 'P'):
+            Tr = self.Tr
             # cálculo do parâmetro Alpha
             self.Alpha_r = 1/sqrt(Tr)
             return rk_mod.baseTP(self)
@@ -214,6 +216,9 @@ class pr_mod(object):
         if hasattr(self, 'P'):
             self.Pr = self.P/Pc 
     
+    def __repr__(self):
+        return str(self.PR())
+
     def baseTP(self):
         Tr = self.Tr
         Pr = self.Pr
@@ -417,3 +422,8 @@ class bwrs(object):
         T_boyle = Tc*Tr
 
         return {'Tboyle':T_boyle}
+
+
+if __name__ == '__main__':
+    a = vdw_base(T=300,P=40,comp='methane')
+    print(a.vdw())
