@@ -5,9 +5,9 @@ __all__ = ['vdw_base', 'rk_mod', 'pr_mod', 'bwrs']
 
 
 from math import sqrt, cos, acos, exp, log, pi
-from database import BdD
+from .database import BdD
 from thermosolver.config import config_bwrs, config_vdw, config_rk_mod, config_pr_mod
-from cubicsolver import solverAnalitic
+from .cubicsolver import solverAnalitic
 
 
 class vdw_mod(object):
